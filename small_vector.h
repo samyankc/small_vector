@@ -10,50 +10,30 @@ namespace sv
     struct small_vector
     {
         using SizeType = unsigned int;
-        constexpr static auto StructSize = sizeof( small_vector<T, CapacityRequest> );
+        constexpr static auto StructSize = sizeof( small_vector );
         constexpr static auto ElementSize = sizeof( T );
         constexpr static auto InternalCapacity = ( StructSize - sizeof( SizeType ) ) / ElementSize;
 
-        using pointer = T*;
-
-        union
-        {
-            struct
-            {
+        union {
+            struct {
                 SizeType UsingExternal : 1, Size : 8 * sizeof( SizeType ) - 1;
                 T InternalBuffer[ CapacityRequest ];
             };
-            struct
-            {
+            struct {
                 SizeType : 8 * sizeof( SizeType );
                 SizeType Capacity;
                 T* ExternalBuffer;
             };
         };
 
-        void write_to( void* d, int n ) const { memcpy( d, begin(), n * ElementSize ); }
+        small_vector()  { memset( this, 0, StructSize ); }
+        ~small_vector() { if ( UsingExternal ) delete[] ExternalBuffer; }
 
-        small_vector()
-        {
-            //Size = 0;
-            //UsingExternal = false;
-            memset( this, 0, StructSize );
-        }
-
-        ~small_vector()
-        {
-            if ( UsingExternal ) delete[] ExternalBuffer;
-        }
-
-        SizeType size() const { return Size; }
-
-        bool empty() const { return size() == 0; }
-        
-        SizeType capacity() const { return UsingExternal ? Capacity : InternalCapacity; }
-
-        T* begin() const { return UsingExternal ? ExternalBuffer : (T*)InternalBuffer; }
-
-        T* end() const { return begin() + size(); }
+        SizeType  size()      const { return Size; }
+        bool      empty()     const { return size() == 0; }
+        SizeType  capacity()  const { return UsingExternal ? Capacity : InternalCapacity; }
+        T*        begin()     const { return UsingExternal ? ExternalBuffer : (T*)InternalBuffer; }
+        T*        end()       const { return begin() + size(); }
 
         T& operator[]( int n ) { return begin()[ n ]; }
 
@@ -68,20 +48,18 @@ namespace sv
             ExternalBuffer = allocate( n );
             Capacity = n;
         }
-
+        
+        void write_to( void* d, int n ) const { memcpy( d, begin(), n * ElementSize ); }
+        
         void reserve( SizeType n )
         {
             if ( n <= capacity() ) return;
-
             auto NewBuffer = allocate( n );
-
             write_to( NewBuffer, size() );
-            
             if ( UsingExternal )
                 delete[] ExternalBuffer;
             else
                 UsingExternal = true;
-                
             ExternalBuffer = NewBuffer;
             Capacity = n;
         }
@@ -97,7 +75,7 @@ namespace sv
 
         template <int N>
         auto& operator=( const small_vector<T, N>& Source ) { return assign_imp( Source ); }
-        auto& operator=( const small_vector      & Source ) { return assign_imp( Source ); } // damn default operator=
+        auto& operator=( const small_vector      & Source ) { return assign_imp( Source ); }
 
         void push_back( const T& NewElement )
         {
@@ -108,14 +86,11 @@ namespace sv
         
         void operator+=( const T& NewElement ) { push_back( NewElement ); }
         
-        void pop_back()
-        {
-            if ( size() ) --Size;
-        }
+        void pop_back() { if ( size() ) --Size; }
 
         void erase_every(const T TargetValue)
         {
-            Size -= end() - std::partition( begin(), end(), [ TargetValue ]( T Value ) { return Value != TargetValue; } );
+            Size -= end() - std::partition( begin(), end(), [ TargetValue ]( T Element ) { return Element != TargetValue; } );
         }
     };
 
@@ -136,7 +111,8 @@ namespace sv
             auto Byte = (unsigned char*)( &src );
             for ( int i = bytes; i-- > 0; )
             {
-                for ( int bit = 8; bit-- > 0; ) putchar( Byte[ i ] >> bit & 1 ? '1' : 'o' );
+                for ( int bit = 8; bit-- > 0; )
+                    putchar( Byte[ i ] >> bit & 1 ? '1' : 'o' );
                 putchar(' ');
                 if ( i % ColumnCount == 0 ) printf( "[%3u ]\n", i );
             }
